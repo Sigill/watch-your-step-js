@@ -1,8 +1,18 @@
 {
   "name": "@sigill/watch-your-step",
   "version": "0.1.0",
-  "types": "./dist/index.d.ts",
   "type": "module",
+  "description": "",
+  "license": "MIT",
+  "author": {
+    "name": "Cyrille Faucheux",
+    "email": "cyrille.faucheux@gmail.com"
+  },
+  "repository": "github:Sigill/watch-your-step-js",
+  "engines": {
+    "node": ">=16"
+  },
+  "types": "./dist/index.d.ts",
   "exports": "./dist/main.js",
   "scripts": {
     "lint": "eslint *.ts",
@@ -11,12 +21,6 @@
     "dev": "npm run lint && npm run build && npm run test",
     "watch": "nodemon"
   },
-  "author": {
-    "name": "Cyrille Faucheux",
-    "email": "cyrille.faucheux@gmail.com"
-  },
-  "license": "MIT",
-  "description": "",
   "dependencies": {
     "value-or-promise": "^1.0.11"
   },
