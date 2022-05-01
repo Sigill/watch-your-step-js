@@ -1,0 +1,8 @@
+{
+  "verbose": false,
+  "ignore": [
+    "dist"
+  ],
+  "ext": "ts",
+  "exec": "npm run dev"
+}
