@@ -1,32 +1,91 @@
-import assert from 'assert';
 import { ValueOrPromise } from 'value-or-promise';
 
-export function step<T>({title, action, skip}: { title?: string; action: () => T; skip?: () => string | boolean; }): T | undefined;
-export function step<T>({title, action, skip}: { title?: string; action: () => Promise<T>; skip?: () => string | boolean; }): Promise<T> | undefined;
-export function step<T>({title, action, skip}: { title?: string; action: () => T | Promise<T>; skip?: () => string | boolean; }): T | Promise<T> | undefined {
-  assert(!skip || title, 'Title required for skippable tasks');
+interface BaseEvent {
+  title: string;
+  date: Date;
+}
+
+interface StartEvent extends BaseEvent {
+  type: 'start';
+}
+
+interface SkipEvent extends BaseEvent {
+  type: 'skip';
+  reason?: string;
+}
+
+interface SuccessEvent extends BaseEvent {
+  type: 'success';
+  duration: number;
+}
+
+interface FailureEvent extends BaseEvent {
+  type: 'failure';
+  duration: number;
+}
+
+export type Event = StartEvent | SkipEvent | SuccessEvent | FailureEvent;
+
+export function defaultLogFunction(event: Event) {
+  switch (event.type) {
+    case 'skip': {
+      console.log(event.reason ? `[SKIPPED] ${event.title} (${event.reason})` : `[SKIPPED] ${event.title}`);
+    } break;
+    case 'start': {
+      console.log(`[STARTED] ${event.title}`);
+    } break;
+    case 'success': {
+      console.log(`[SUCCESS] ${event.title} (${(event.duration/1000).toFixed(1)}s)`);
+    } break;
+    case 'failure': {
+      console.log(`[FAILURE] ${event.title} (${(event.duration/1000).toFixed(1)}s)`);
+    } break;
+  }
+}
+interface NonSkippableStepSpecs<T> {
+  title: string;
+  action: () => T;
+}
+
+interface StepSpecs<T> extends NonSkippableStepSpecs<T> {
+  skip?: () => string | boolean;
+}
+
+type SkippableStepSpecs<T> = Required<StepSpecs<T>>;
+
+interface StepOptions {
+  logFunction?: (event: Event) => void;
+}
+
+export interface StepFunction {
+  <T>(data: NonSkippableStepSpecs<T>): T;
+  <T>(data: NonSkippableStepSpecs<Promise<T>>): Promise<T>;
+  <T>(data: SkippableStepSpecs<T>): T | undefined;
+  <T>(data: SkippableStepSpecs<Promise<T>>): Promise<T> | undefined;
+}
+
+export function step<T>(data: NonSkippableStepSpecs<T>, options?: StepOptions): T;
+export function step<T>(data: NonSkippableStepSpecs<Promise<T>>, options?: StepOptions): Promise<T>;
+export function step<T>(data: SkippableStepSpecs<T>, options?: StepOptions): T | undefined;
+export function step<T>(data: SkippableStepSpecs<Promise<T>>, options?: StepOptions): Promise<T> | undefined;
+export function step<T>(data: StepSpecs<T | Promise<T>>, options: StepOptions = {}): T | Promise<T> | undefined {
+  const start = new Date();
+
+  const {title, action, skip} = data;
+  const {logFunction: log = defaultLogFunction} = options;
 
   const skipped = skip && skip();
   if (skipped) {
-    console.log(typeof skipped === 'string' ? `[SKIPPED] ${title} (${skipped})` : `[SKIPPED] ${title}`);
+    log({type: 'skip', date: new Date(), title, reason: typeof skipped === 'string' ? skipped : undefined});
     return;
   }
 
-  if (title)
-    console.log(`[STARTED] ${title}`);
-
-  const start = Date.now();
-  const log_finish = (status: string) => {
-    if (title) {
-      const finish = Date.now();
-      console.log(`[${status}] ${title} (${((finish - start)/1000).toFixed(1)}s)`);
-    }
-  };
+  log({type: 'start', title, date: start})
 
   return new ValueOrPromise(action)
     .then(
-      (args) => { log_finish('SUCCESS'); return args; },
-      (err) => { log_finish('FAILED'); throw err; }
+      (args) => { const date = new Date(); log({type: 'success', title, date, duration: date.getTime() - start.getTime()}); return args; },
+      (err) => { const date = new Date(); log({type: 'failure', title, date, duration: date.getTime() - start.getTime()}); throw err; }
     )
     .resolve();
 }
