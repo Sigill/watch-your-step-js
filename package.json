@@ -2,7 +2,7 @@
   "name": "@sigill/watch-your-step",
   "version": "0.1.0",
   "type": "module",
-  "description": "",
+  "description": "Wraps a function in order to emit log upon start/finish/error.",
   "license": "MIT",
   "author": {
     "name": "Cyrille Faucheux",
@@ -21,6 +21,11 @@
     "dev": "npm run lint && npm run build && npm run test",
     "watch": "nodemon"
   },
+  "files": [
+    "dist/index.js",
+    "dist/index.d.ts",
+    "dist/index.js.map"
+  ],
   "dependencies": {
     "value-or-promise": "^1.0.11"
   },
