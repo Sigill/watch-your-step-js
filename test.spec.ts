@@ -31,7 +31,7 @@ describe('defaultLogFunction()', function() {
 
   it('log success events', function() {
     defaultLogFunction({type: 'success', title: 'successful step', date: new Date(), duration: 200});
-    expect(log).to.have.been.calledOnceWith('[SUCCESS] successful step (0.2s)');
+    expect(log).to.have.been.calledOnceWith('[SUCCESS] successful step (200ms)');
   });
 
   it('log failure events', function() {

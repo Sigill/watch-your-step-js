@@ -1,6 +1,6 @@
 {
   "name": "@sigill/watch-your-step",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "type": "module",
   "description": "Wraps a function in order to emit log upon start/finish/error.",
   "license": "MIT",
@@ -28,6 +28,7 @@
     "dist/index.js.map"
   ],
   "dependencies": {
+    "pretty-ms": "^7.0.1",
     "value-or-promise": "^1.0.11"
   },
   "devDependencies": {

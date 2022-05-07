@@ -1,3 +1,4 @@
+import prettyMilliseconds from 'pretty-ms';
 import { ValueOrPromise } from 'value-or-promise';
 
 interface BaseEvent {
@@ -35,10 +36,10 @@ export function defaultLogFunction(event: Event) {
       console.log(`[STARTED] ${event.title}`);
     } break;
     case 'success': {
-      console.log(`[SUCCESS] ${event.title} (${(event.duration/1000).toFixed(1)}s)`);
+      console.log(`[SUCCESS] ${event.title} (${prettyMilliseconds(event.duration)})`);
     } break;
     case 'failure': {
-      console.log(`[FAILURE] ${event.title} (${(event.duration/1000).toFixed(1)}s)`);
+      console.log(`[FAILURE] ${event.title} (${prettyMilliseconds(event.duration)})`);
     } break;
   }
 }
