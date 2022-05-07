@@ -1,6 +1,6 @@
 {
   "name": "@sigill/watch-your-step",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "type": "module",
   "description": "Wraps a function in order to emit log upon start/finish/error.",
   "license": "MIT",
@@ -13,7 +13,7 @@
     "node": ">=16"
   },
   "types": "./dist/index.d.ts",
-  "exports": "./dist/main.js",
+  "exports": "./dist/index.js",
   "scripts": {
     "lint": "eslint *.ts",
     "build": "tsc",
