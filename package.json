@@ -1,6 +1,6 @@
 {
   "name": "@sigill/watch-your-step",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "description": "Wraps a function in order to emit log upon start/finish/error.",
   "license": "MIT",
@@ -22,6 +22,7 @@
     "watch": "nodemon"
   },
   "files": [
+    "index.ts",
     "dist/index.js",
     "dist/index.d.ts",
     "dist/index.js.map"
