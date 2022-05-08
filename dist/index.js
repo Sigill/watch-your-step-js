@@ -1,25 +1,37 @@
 import prettyMilliseconds from 'pretty-ms';
 import { ValueOrPromise } from 'value-or-promise';
-export function defaultLogFunction(event) {
-    switch (event.type) {
-        case 'skip':
+export var StepEvents;
+(function (StepEvents) {
+    StepEvents["SKIPPED"] = "SKIPPED";
+    StepEvents["STARTED"] = "STARTED";
+    StepEvents["FULLFILLED"] = "FULLFILLED";
+    StepEvents["FAILED"] = "FAILED";
+})(StepEvents || (StepEvents = {}));
+/**
+ * Defaults log function that logs events using `console.log()`.
+ *
+ * @param e The event.
+ */
+export function defaultLogFunction(e) {
+    switch (e.type) {
+        case StepEvents.SKIPPED:
             {
-                console.log(event.reason ? `[SKIPPED] ${event.title} (${event.reason})` : `[SKIPPED] ${event.title}`);
+                console.log(e.reason ? `[SKIPPED] ${e.title} (${e.reason})` : `[SKIPPED] ${e.title}`);
             }
             break;
-        case 'start':
+        case StepEvents.STARTED:
             {
-                console.log(`[STARTED] ${event.title}`);
+                console.log(`[STARTED] ${e.title}`);
             }
             break;
-        case 'success':
+        case StepEvents.FULLFILLED:
             {
-                console.log(`[SUCCESS] ${event.title} (${prettyMilliseconds(event.duration)})`);
+                console.log(`[SUCCESS] ${e.title} (${prettyMilliseconds(e.duration)})`);
             }
             break;
-        case 'failure':
+        case StepEvents.FAILED:
             {
-                console.log(`[FAILURE] ${event.title} (${prettyMilliseconds(event.duration)})`);
+                console.log(`[FAILURE] ${e.title} (${prettyMilliseconds(e.duration)})`);
             }
             break;
     }
@@ -30,12 +42,12 @@ export function step(data, options = {}) {
     const { logFunction: log = defaultLogFunction } = options;
     const skipped = skip && skip();
     if (skipped) {
-        log({ type: 'skip', date: new Date(), title, reason: typeof skipped === 'string' ? skipped : undefined });
+        log({ type: StepEvents.SKIPPED, date: new Date(), title, reason: typeof skipped === 'string' ? skipped : undefined });
         return;
     }
-    log({ type: 'start', title, date: start });
+    log({ type: StepEvents.STARTED, title, date: start });
     return new ValueOrPromise(action)
-        .then((args) => { const date = new Date(); log({ type: 'success', title, date, duration: date.getTime() - start.getTime() }); return args; }, (err) => { const date = new Date(); log({ type: 'failure', title, date, duration: date.getTime() - start.getTime() }); throw err; })
+        .then((args) => { const date = new Date(); log({ type: StepEvents.FULLFILLED, title, date, duration: date.getTime() - start.getTime() }); return args; }, (err) => { const date = new Date(); log({ type: StepEvents.FAILED, title, date, duration: date.getTime() - start.getTime() }); throw err; })
         .resolve();
 }
 //# sourceMappingURL=index.js.map

@@ -2,7 +2,7 @@ import * as chai from 'chai';
 import * as sinon from 'sinon';
 import chaiAsPromised  from 'chai-as-promised';
 import sinonChai from "sinon-chai";
-import { defaultLogFunction, step, StepFunction } from './index.js';
+import { defaultLogFunction, step, StepEvents, StepFunction } from './index.js';
 
 chai.use(chaiAsPromised);
 chai.use(sinonChai);
@@ -13,29 +13,29 @@ const match = sinon.match;
 describe('defaultLogFunction()', function() {
   let log: sinon.SinonSpy<[message?: any, ...optionalParams: any[]], void>;
   beforeEach(function() {
-    log = sinon.stub(console, 'log');
+    log = sinon.spy(console, 'log');
   });
   afterEach(function() {
     sinon.restore();
   });
 
   it('log start events', function() {
-    defaultLogFunction({type: 'start', title: 'started step', date: new Date()});
+    defaultLogFunction({type: StepEvents.STARTED, title: 'started step', date: new Date()});
     expect(log).to.have.been.calledOnceWith('[STARTED] started step');
   });
 
   it('log skip events', function() {
-    defaultLogFunction({type: 'skip', title: 'skipped step', date: new Date()});
+    defaultLogFunction({type: StepEvents.SKIPPED, title: 'skipped step', date: new Date()});
     expect(log).to.have.been.calledOnceWith('[SKIPPED] skipped step');
   });
 
   it('log success events', function() {
-    defaultLogFunction({type: 'success', title: 'successful step', date: new Date(), duration: 200});
+    defaultLogFunction({type: StepEvents.FULLFILLED, title: 'successful step', date: new Date(), duration: 200});
     expect(log).to.have.been.calledOnceWith('[SUCCESS] successful step (200ms)');
   });
 
   it('log failure events', function() {
-    defaultLogFunction({type: 'failure', title: 'failed step', date: new Date(), duration: 1200});
+    defaultLogFunction({type: StepEvents.FAILED, title: 'failed step', date: new Date(), duration: 1200});
     expect(log).to.have.been.calledOnceWith('[FAILURE] failed step (1.2s)');
   });
 });
@@ -51,17 +51,17 @@ describe('step()', function() {
     sinon.restore();
   });
 
-  it("logs 'start' and 'success' events, then returns the value returned by a synchronous function", function() {
+  it("logs 'started' and 'fullfilled' events, then returns the value returned by a synchronous function", function() {
     const a: number = spiedStep({title: 'sync function', action: () => 42});
     expect(log).to.have.been.calledTwice;
     expect(log.firstCall).to.have.been.calledWith(
       match.object
-      .and(match.has('type', 'start'))
+      .and(match.has('type', StepEvents.STARTED))
       .and(match.has('title', 'sync function'))
       .and(match.has('date', sinon.match.date)));
     expect(log.secondCall).to.have.been.calledWith(
       match.object
-      .and(match.has('type', 'success'))
+      .and(match.has('type', StepEvents.FULLFILLED))
       .and(match.has('title', 'sync function'))
       .and(match.has('date', sinon.match.date))
       .and(match.has('duration', sinon.match.number)));
@@ -77,12 +77,12 @@ describe('step()', function() {
     expect(log).to.have.been.calledTwice;
     expect(log.firstCall).to.have.been.calledWith(
       match.object
-      .and(match.has('type', 'start'))
+      .and(match.has('type', StepEvents.STARTED))
       .and(match.has('title', 'sync function'))
       .and(match.has('date', sinon.match.date)));
     expect(log.secondCall).to.have.been.calledWith(
       match.object
-      .and(match.has('type', 'failure'))
+      .and(match.has('type', StepEvents.FAILED))
       .and(match.has('title', 'sync function'))
       .and(match.has('date', sinon.match.date))
       .and(match.has('duration', sinon.match.number)));
@@ -94,12 +94,12 @@ describe('step()', function() {
     expect(log).to.have.been.calledTwice;
     expect(log.firstCall).to.have.been.calledWith(
       match.object
-      .and(match.has('type', 'start'))
+      .and(match.has('type', StepEvents.STARTED))
       .and(match.has('title', 'async function'))
       .and(match.has('date', sinon.match.date)));
     expect(log.secondCall).to.have.been.calledWith(
       match.object
-      .and(match.has('type', 'success'))
+      .and(match.has('type', StepEvents.FULLFILLED))
       .and(match.has('title', 'async function'))
       .and(match.has('date', sinon.match.date))
       .and(match.has('duration', sinon.match.number)));
@@ -112,12 +112,12 @@ describe('step()', function() {
     expect(log).to.have.been.calledTwice;
     expect(log.firstCall).to.have.been.calledWith(
       match.object
-      .and(match.has('type', 'start'))
+      .and(match.has('type', StepEvents.STARTED))
       .and(match.has('title', 'async function'))
       .and(match.has('date', sinon.match.date)));
     expect(log.secondCall).to.have.been.calledWith(
       match.object
-      .and(match.has('type', 'failure'))
+      .and(match.has('type', StepEvents.FAILED))
       .and(match.has('title', 'async function'))
       .and(match.has('date', sinon.match.date))
       .and(match.has('duration', sinon.match.number)));
@@ -127,7 +127,7 @@ describe('step()', function() {
     const a: number | undefined = spiedStep({title: 'skippable function', action: () => 42, skip: () => true});
     expect(log).to.have.been.calledOnceWith(
       match.object
-      .and(match.has('type', 'skip'))
+      .and(match.has('type', StepEvents.SKIPPED))
       .and(match.has('title', 'skippable function'))
       .and(match.has('date', sinon.match.date)));
     expect(a).to.be.undefined;
@@ -137,7 +137,7 @@ describe('step()', function() {
     const a: number | undefined = spiedStep({title: 'skippable function', action: () => 42, skip: () => 'because'});
     expect(log).to.have.been.calledOnceWith(
       match.object
-      .and(match.has('type', 'skip'))
+      .and(match.has('type', StepEvents.SKIPPED))
       .and(match.has('title', 'skippable function'))
       .and(match.has('date', sinon.match.date))
       .and(match.has('reason', 'because')));

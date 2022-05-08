@@ -1,8 +1,12 @@
 {
   "name": "@sigill/watch-your-step",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "type": "module",
   "description": "Wraps a function in order to emit log upon start/finish/error.",
+  "keywords": [
+    "task",
+    "runner"
+  ],
   "license": "MIT",
   "author": {
     "name": "Cyrille Faucheux",

@@ -1,75 +1,143 @@
 import prettyMilliseconds from 'pretty-ms';
 import { ValueOrPromise } from 'value-or-promise';
 
-interface BaseEvent {
+export enum StepEvents {
+  SKIPPED = 'SKIPPED',
+  STARTED = 'STARTED',
+  FULLFILLED = 'FULLFILLED',
+  FAILED = 'FAILED'
+}
+
+/** Base event type. */
+export interface BaseStepEvent {
+  /** Title of the step. */
   title: string;
+
+  /** Date of the event. */
   date: Date;
 }
 
-interface StartEvent extends BaseEvent {
-  type: 'start';
+export interface StepStartedEvent extends BaseStepEvent {
+  type: StepEvents.STARTED;
 }
 
-interface SkipEvent extends BaseEvent {
-  type: 'skip';
+export interface StepSkippedEvent extends BaseStepEvent {
+  type: StepEvents.SKIPPED;
+
+  /** Reason why the step was skipped. */
   reason?: string;
 }
 
-interface SuccessEvent extends BaseEvent {
-  type: 'success';
+export interface StepSettledEvent extends BaseStepEvent {
+  /** Duration of the step. */
   duration: number;
 }
 
-interface FailureEvent extends BaseEvent {
-  type: 'failure';
-  duration: number;
+export interface StepFullfilledEvent extends StepSettledEvent {
+  type: StepEvents.FULLFILLED;
 }
 
-export type Event = StartEvent | SkipEvent | SuccessEvent | FailureEvent;
+export interface StepFailedEvent extends StepSettledEvent {
+  type: StepEvents.FAILED;
+}
 
-export function defaultLogFunction(event: Event) {
-  switch (event.type) {
-    case 'skip': {
-      console.log(event.reason ? `[SKIPPED] ${event.title} (${event.reason})` : `[SKIPPED] ${event.title}`);
+/** Type of all events passed to the log function. */
+export type StepEvent = StepStartedEvent | StepSkippedEvent | StepFullfilledEvent | StepFailedEvent;
+
+/**
+ * Defaults log function that logs events using `console.log()`.
+ *
+ * @param e The event.
+ */
+export function defaultLogFunction(e: StepEvent) {
+  switch (e.type) {
+    case StepEvents.SKIPPED: {
+      console.log(e.reason ? `[SKIPPED] ${e.title} (${e.reason})` : `[SKIPPED] ${e.title}`);
     } break;
-    case 'start': {
-      console.log(`[STARTED] ${event.title}`);
+    case StepEvents.STARTED: {
+      console.log(`[STARTED] ${e.title}`);
     } break;
-    case 'success': {
-      console.log(`[SUCCESS] ${event.title} (${prettyMilliseconds(event.duration)})`);
+    case StepEvents.FULLFILLED: {
+      console.log(`[SUCCESS] ${e.title} (${prettyMilliseconds(e.duration)})`);
     } break;
-    case 'failure': {
-      console.log(`[FAILURE] ${event.title} (${prettyMilliseconds(event.duration)})`);
+    case StepEvents.FAILED: {
+      console.log(`[FAILURE] ${e.title} (${prettyMilliseconds(e.duration)})`);
     } break;
   }
 }
-interface NonSkippableStepSpecs<T> {
+
+/**
+ * A non skippable step.
+ * @template T Return type of the step.
+ */
+interface NonSkippableStep<T> {
+  /** Title of the step. */
   title: string;
+
+  /** The function to execute. */
   action: () => T;
 }
 
-interface StepSpecs<T> extends NonSkippableStepSpecs<T> {
+/**
+ * A step.
+ * @template T Return type of the step.
+ */
+interface Step<T> extends NonSkippableStep<T> {
   skip?: () => string | boolean;
 }
 
-type SkippableStepSpecs<T> = Required<StepSpecs<T>>;
+/**
+ * A skippable step.
+ * @template T Return type of the step.
+ */
+type SkippableStep<T> = Required<Step<T>>;
 
+/** Options accepted by [[`step`]]. */
 interface StepOptions {
-  logFunction?: (event: Event) => void;
+  logFunction?: (e: StepEvent) => void;
 }
 
+/**
+ * Minimal prototype of the [[`step`]] function (without options).
+ *
+ * Use it when you need to define a customized version of [[`step`]].
+ *
+ * See [[`step`]] for more details about the various prototypes.
+ *
+ * @example
+ * ```typescript
+ * function customLogFunction(e: StepEvent) { ... }
+ * const customStep: StepFunction = (args: any) => step(args, {logFunction: customLogFunction})
+ * ```
+ *
+ * @returns The value returned by the action.
+ */
 export interface StepFunction {
-  <T>(data: NonSkippableStepSpecs<T>): T;
-  <T>(data: NonSkippableStepSpecs<Promise<T>>): Promise<T>;
-  <T>(data: SkippableStepSpecs<T>): T | undefined;
-  <T>(data: SkippableStepSpecs<Promise<T>>): Promise<T> | undefined;
+  <T>(data: NonSkippableStep<T>): T;
+  <T>(data: NonSkippableStep<Promise<T>>): Promise<T>;
+  <T>(data: SkippableStep<T>): T | undefined;
+  <T>(data: SkippableStep<Promise<T>>): Promise<T> | undefined;
 }
 
-export function step<T>(data: NonSkippableStepSpecs<T>, options?: StepOptions): T;
-export function step<T>(data: NonSkippableStepSpecs<Promise<T>>, options?: StepOptions): Promise<T>;
-export function step<T>(data: SkippableStepSpecs<T>, options?: StepOptions): T | undefined;
-export function step<T>(data: SkippableStepSpecs<Promise<T>>, options?: StepOptions): Promise<T> | undefined;
-export function step<T>(data: StepSpecs<T | Promise<T>>, options: StepOptions = {}): T | Promise<T> | undefined {
+/**
+ * Execute an action.
+ *
+ * The various prototypes of this function are just provided to enhance type-checking:
+ *
+ * - If the action is asynchronous, the returned value will actually be a `Promise`.
+ * - An unskippable step will return the action's return value, while a skippable step
+ * can also return `undefined`.
+ *
+ * @param data The action to execute.
+ * @param options
+ *
+ * @returns The value returned by the action, or undefined if the action was skipped.
+ */
+export function step<T>(data: NonSkippableStep<T>, options?: StepOptions): T;
+export function step<T>(data: NonSkippableStep<Promise<T>>, options?: StepOptions): Promise<T>;
+export function step<T>(data: SkippableStep<T>, options?: StepOptions): T | undefined;
+export function step<T>(data: SkippableStep<Promise<T>>, options?: StepOptions): Promise<T> | undefined;
+export function step<T>(data: Step<T | Promise<T>>, options: StepOptions = {}): T | Promise<T> | undefined {
   const start = new Date();
 
   const {title, action, skip} = data;
@@ -77,16 +145,16 @@ export function step<T>(data: StepSpecs<T | Promise<T>>, options: StepOptions = 
 
   const skipped = skip && skip();
   if (skipped) {
-    log({type: 'skip', date: new Date(), title, reason: typeof skipped === 'string' ? skipped : undefined});
+    log({type: StepEvents.SKIPPED, date: new Date(), title, reason: typeof skipped === 'string' ? skipped : undefined});
     return;
   }
 
-  log({type: 'start', title, date: start})
+  log({type: StepEvents.STARTED, title, date: start})
 
   return new ValueOrPromise(action)
     .then(
-      (args) => { const date = new Date(); log({type: 'success', title, date, duration: date.getTime() - start.getTime()}); return args; },
-      (err) => { const date = new Date(); log({type: 'failure', title, date, duration: date.getTime() - start.getTime()}); throw err; }
+      (args) => { const date = new Date(); log({type: StepEvents.FULLFILLED, title, date, duration: date.getTime() - start.getTime()}); return args; },
+      (err) => { const date = new Date(); log({type: StepEvents.FAILED, title, date, duration: date.getTime() - start.getTime()}); throw err; }
     )
     .resolve();
 }
