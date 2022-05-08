@@ -17,7 +17,7 @@
   "scripts": {
     "lint": "eslint *.ts",
     "build": "tsc",
-    "test": "mocha ./dist/*.spec.js",
+    "test": "cross-env NODE_OPTIONS='-r source-map-support/register' mocha ./dist/*.spec.js",
     "dev": "npm run lint && npm run build && npm run test",
     "watch": "nodemon"
   },
@@ -40,10 +40,12 @@
     "@typescript-eslint/eslint-plugin": "^5.21.0",
     "chai": "^4.3.6",
     "chai-as-promised": "^7.1.1",
+    "cross-env": "^7.0.3",
     "eslint": "^8.14.0",
     "mocha": "^9.2.2",
     "nodemon": "^2.0.16",
     "sinon-chai": "^3.7.0",
+    "source-map-support": "^0.5.21",
     "typescript": "^4.6.4"
   }
 }
