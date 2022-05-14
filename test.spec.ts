@@ -2,13 +2,22 @@ import * as chai from 'chai';
 import * as sinon from 'sinon';
 import chaiAsPromised  from 'chai-as-promised';
 import sinonChai from "sinon-chai";
-import { defaultLogFunction, step, StepEvents, StepFunction } from './index.js';
+import { defaultLogFunction, step, StepEvents, StepFunctionCommon, StepLongFunction, StepShortFunction } from './index.js';
 
 chai.use(chaiAsPromised);
 chai.use(sinonChai);
 
 const expect = chai.expect;
 const match = sinon.match;
+
+function quoteIfString(v: string | number) {
+  return typeof v === 'string' ? `"${v}"` : v;
+}
+
+const hasNo = (member: string | number) => sinon.match(function (value) {
+  return value[member] === undefined;
+}, `hasNo(${quoteIfString(member)})`);
+
 
 describe('defaultLogFunction()', function() {
   let log: sinon.SinonSpy<[message?: any, ...optionalParams: any[]], void>;
@@ -42,7 +51,8 @@ describe('defaultLogFunction()', function() {
 
 describe('step()', function() {
   let log: sinon.SinonSpy;
-  const  spiedStep: StepFunction = (args: any) => step(args, {logFunction: log});
+  const title = 'action title';
+  const reason = 'because';
 
   beforeEach(function() {
     log = sinon.spy();
@@ -51,96 +61,133 @@ describe('step()', function() {
     sinon.restore();
   });
 
-  it("logs 'started' and 'fullfilled' events, then returns the value returned by a synchronous function", function() {
-    const a: number = spiedStep({title: 'sync function', action: () => 42});
-    expect(log).to.have.been.calledTwice;
-    expect(log.firstCall).to.have.been.calledWith(
+  function expectStartedEvent(logCall: sinon.SinonSpyCall<any[], any>) {
+    expect(logCall).to.have.been.calledWith(
       match.object
       .and(match.has('type', StepEvents.STARTED))
-      .and(match.has('title', 'sync function'))
+      .and(match.has('title', title))
       .and(match.has('date', sinon.match.date)));
-    expect(log.secondCall).to.have.been.calledWith(
+  }
+
+  function expectSettledEvent(logCall: sinon.SinonSpyCall<any[], any>, {eventType}: {eventType: StepEvents.FULLFILLED | StepEvents.FAILED}) {
+    expect(logCall).to.have.been.calledWith(
       match.object
-      .and(match.has('type', StepEvents.FULLFILLED))
-      .and(match.has('title', 'sync function'))
+      .and(match.has('type', eventType))
+      .and(match.has('title', title))
       .and(match.has('date', sinon.match.date))
       .and(match.has('duration', sinon.match.number)));
-    expect(a).to.be.equal(42);
+  }
+
+  function expectFullfilledEvent(logCall: sinon.SinonSpyCall<any[], any>) {
+    expectSettledEvent(logCall, {eventType: StepEvents.FULLFILLED});
+  }
+
+  function expectFailedEvent(logCall: sinon.SinonSpyCall<any[], any>) {
+    expectSettledEvent(logCall, {eventType: StepEvents.FAILED});
+  }
+
+  function expectSkippedEvent(logCall: sinon.SinonSpyCall<any[], any>, {reason}: {reason?: string} = {}) {
+    const makeMatcher = () => {
+      const matcher = match.object
+        .and(match.has('type', StepEvents.SKIPPED))
+        .and(match.has('title', sinon.match.same(title)))
+        .and(match.has('date', sinon.match.date));
+      return reason === undefined ? matcher.and(hasNo('reason')) : matcher.and(match.has('reason', reason));
+    }
+    expect(logCall).to.have.been.calledWith(makeMatcher());
+  }
+
+  describe('using object syntax', () => {
+    const spiedStep = ((...args: any[]) => (step as StepFunctionCommon)(...args, {logFunction: log})) as StepLongFunction;
+
+    it("emits 'started' and 'fullfilled' events, then returns the value returned by a synchronous function", function() {
+      const a: number = spiedStep({title, action: () => 42});
+      expect(a).to.be.equal(42);
+      expect(log).to.have.been.calledTwice;
+      expectStartedEvent(log.firstCall);
+      expectFullfilledEvent(log.secondCall);
+    });
+
+    it("emits 'started' and 'failed' events, then rethrow the error thrown by a synchronous function", function() {
+      const err = new Error('plonk');
+      expect(() => {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const a: number = spiedStep({title, action: () => { throw err; }});
+      }).to.throw(err);
+      expect(log).to.have.been.calledTwice;
+      expectStartedEvent(log.firstCall);
+      expectFailedEvent(log.secondCall);
+    });
+
+    it("emits 'started' and 'fullfilled' events, then returns the promise returned by an asynchronous function", async function() {
+      const a: Promise<number> = spiedStep({title, action: async () => new Promise(resolve => setTimeout(() => resolve(42), 75))});
+      await expect(a).to.eventually.be.equal(42);
+      expect(log).to.have.been.calledTwice;
+      expectStartedEvent(log.firstCall);
+      expectFullfilledEvent(log.secondCall);
+    });
+
+    it("emits 'started' and 'failed' events, then returns the rejected promise rejected using an asynchronous function", async function() {
+      const err = new Error('plonk');
+      const a: Promise<number> = spiedStep({title, action: async () => new Promise((_, reject) => setTimeout(() => reject(err), 75))});
+      await expect(a).to.eventually.be.rejectedWith(Error, 'plonk');
+      expect(log).to.have.been.calledTwice;
+      expectStartedEvent(log.firstCall);
+      expectFailedEvent(log.secondCall);
+    });
+
+    it("emits 'skipped' event, then returns undefined when skipping", function() {
+      const a: number | undefined = spiedStep({title, action: () => 42, skip: () => true});
+      expect(a).to.be.undefined;
+      expect(log).to.have.been.calledOnce;
+      expectSkippedEvent(log.firstCall);
+    });
+
+    it("emits 'skipped' event with a reason, then returns undefined when skipping", function() {
+      const a: number | undefined = spiedStep({title, action: () => 42, skip: () => reason});
+      expect(a).to.be.undefined;
+      expect(log).to.have.been.calledOnce;
+      expectSkippedEvent(log.firstCall, {reason});
+    });
   });
 
-  it("logs 'start' and 'failure' events, then rethrow the error thrown by a synchronous function", function() {
-    const err = new Error('plonk');
-    expect(() => {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const a: number = spiedStep({title: 'sync function', action: () => { throw err; }});
-    }).to.throw(err);
-    expect(log).to.have.been.calledTwice;
-    expect(log.firstCall).to.have.been.calledWith(
-      match.object
-      .and(match.has('type', StepEvents.STARTED))
-      .and(match.has('title', 'sync function'))
-      .and(match.has('date', sinon.match.date)));
-    expect(log.secondCall).to.have.been.calledWith(
-      match.object
-      .and(match.has('type', StepEvents.FAILED))
-      .and(match.has('title', 'sync function'))
-      .and(match.has('date', sinon.match.date))
-      .and(match.has('duration', sinon.match.number)));
-  });
+  describe('using shorthand syntax', () => {
+    const spiedStep = ((...args: any[]) => (step as StepFunctionCommon)(...args, {logFunction: log})) as StepShortFunction;
 
-  it("logs 'start' and 'success' events, then returns the promise returned by an asynchronous function", async function() {
-    const a: Promise<number> = spiedStep({title: 'async function', action: async () => new Promise(resolve => setTimeout(() => resolve(42), 75))});
-    await expect(a).to.eventually.be.equal(42);
-    expect(log).to.have.been.calledTwice;
-    expect(log.firstCall).to.have.been.calledWith(
-      match.object
-      .and(match.has('type', StepEvents.STARTED))
-      .and(match.has('title', 'async function'))
-      .and(match.has('date', sinon.match.date)));
-    expect(log.secondCall).to.have.been.calledWith(
-      match.object
-      .and(match.has('type', StepEvents.FULLFILLED))
-      .and(match.has('title', 'async function'))
-      .and(match.has('date', sinon.match.date))
-      .and(match.has('duration', sinon.match.number)));
-  });
+    it("emits 'started' and 'fullfilled' events, then returns the value returned by a synchronous function", function() {
+      const a: number = spiedStep(title, () => 42);
+      expect(a).to.be.equal(42);
+      expect(log).to.have.been.calledTwice;
+      expectStartedEvent(log.firstCall);
+      expectFullfilledEvent(log.secondCall);
+    });
 
-  it("logs 'start' and 'failure' events, then returns the rejected promise rejected using an asynchronous function", async function() {
-    const err = new Error('plonk');
-    const a: Promise<number> = spiedStep({title: 'async function', action: async () => new Promise((_, reject) => setTimeout(() => reject(err), 75))});
-    await expect(a).to.eventually.be.rejectedWith(Error, 'plonk');
-    expect(log).to.have.been.calledTwice;
-    expect(log.firstCall).to.have.been.calledWith(
-      match.object
-      .and(match.has('type', StepEvents.STARTED))
-      .and(match.has('title', 'async function'))
-      .and(match.has('date', sinon.match.date)));
-    expect(log.secondCall).to.have.been.calledWith(
-      match.object
-      .and(match.has('type', StepEvents.FAILED))
-      .and(match.has('title', 'async function'))
-      .and(match.has('date', sinon.match.date))
-      .and(match.has('duration', sinon.match.number)));
-  });
+    it("emits 'started' and 'failed' events, then rethrow the error thrown by a synchronous function", function() {
+      const err = new Error('plonk');
+      expect(() => {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const a: number = spiedStep(title, () => { throw err; });
+      }).to.throw(err);
+      expect(log).to.have.been.calledTwice;
+      expectStartedEvent(log.firstCall);
+      expectFailedEvent(log.secondCall);
+    });
 
-  it("logs 'skipped' event, then returns undefined when skipping", function() {
-    const a: number | undefined = spiedStep({title: 'skippable function', action: () => 42, skip: () => true});
-    expect(log).to.have.been.calledOnceWith(
-      match.object
-      .and(match.has('type', StepEvents.SKIPPED))
-      .and(match.has('title', 'skippable function'))
-      .and(match.has('date', sinon.match.date)));
-    expect(a).to.be.undefined;
-  });
+    it("emits 'started' and 'fullfilled' events, then returns the promise returned by an asynchronous function", async function() {
+      const a: Promise<number> = spiedStep(title, async () => new Promise(resolve => setTimeout(() => resolve(42), 75)));
+      await expect(a).to.eventually.be.equal(42);
+      expect(log).to.have.been.calledTwice;
+      expectStartedEvent(log.firstCall);
+      expectFullfilledEvent(log.secondCall);
+    });
 
-  it("logs 'skipped' event with a reason, then returns undefined when skipping", function() {
-    const a: number | undefined = spiedStep({title: 'skippable function', action: () => 42, skip: () => 'because'});
-    expect(log).to.have.been.calledOnceWith(
-      match.object
-      .and(match.has('type', StepEvents.SKIPPED))
-      .and(match.has('title', 'skippable function'))
-      .and(match.has('date', sinon.match.date))
-      .and(match.has('reason', 'because')));
-    expect(a).to.be.undefined;
+    it("emits 'started' and 'failed' events, then returns the rejected promise rejected using an asynchronous function", async function() {
+      const err = new Error('plonk');
+      const a: Promise<number> = spiedStep(title, async () => new Promise((_, reject) => setTimeout(() => reject(err), 75)));
+      await expect(a).to.eventually.be.rejectedWith(Error, 'plonk');
+      expect(log).to.have.been.calledTwice;
+      expectStartedEvent(log.firstCall);
+      expectFailedEvent(log.secondCall);
+    });
   });
 });

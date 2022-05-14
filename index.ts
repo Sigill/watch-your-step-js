@@ -70,7 +70,7 @@ export function defaultLogFunction(e: StepEvent) {
  * A non skippable step.
  * @template T Return type of the step.
  */
-interface NonSkippableStep<T> {
+export interface NonSkippableStep<T> {
   /** Title of the step. */
   title: string;
 
@@ -82,7 +82,7 @@ interface NonSkippableStep<T> {
  * A step.
  * @template T Return type of the step.
  */
-interface Step<T> extends NonSkippableStep<T> {
+export interface Step<T> extends NonSkippableStep<T> {
   skip?: () => string | boolean;
 }
 
@@ -90,11 +90,27 @@ interface Step<T> extends NonSkippableStep<T> {
  * A skippable step.
  * @template T Return type of the step.
  */
-type SkippableStep<T> = Required<Step<T>>;
+export type SkippableStep<T> = Required<Step<T>>;
 
 /** Options accepted by [[`step`]]. */
 interface StepOptions {
   logFunction?: (e: StepEvent) => void;
+}
+
+ export interface StepShortFunction {
+  <T>(title: string, action: () => T): T;
+  <T>(title: string, action: () => Promise<T>): Promise<T>;
+}
+
+export interface StepLongFunction {
+  <T>(data: NonSkippableStep<T>): T;
+  <T>(data: NonSkippableStep<Promise<T>>): Promise<T>;
+  <T>(data: SkippableStep<T>): T | undefined;
+  <T>(data: SkippableStep<Promise<T>>): Promise<T> | undefined;
+}
+
+export interface StepFunctionCommon {
+  <T>(...args: any[]): T | Promise<T> | undefined;
 }
 
 /**
@@ -107,37 +123,12 @@ interface StepOptions {
  * @example
  * ```typescript
  * function customLogFunction(e: StepEvent) { ... }
- * const customStep: StepFunction = (args: any) => step(args, {logFunction: customLogFunction})
+ * const customStep = ((...args: any[]) => (step as StepGenericPrototype)(...args, {logFunction: log})) as StepFunction;
  * ```
- *
- * @returns The value returned by the action.
  */
-export interface StepFunction {
-  <T>(data: NonSkippableStep<T>): T;
-  <T>(data: NonSkippableStep<Promise<T>>): Promise<T>;
-  <T>(data: SkippableStep<T>): T | undefined;
-  <T>(data: SkippableStep<Promise<T>>): Promise<T> | undefined;
-}
+export interface StepFunction extends StepShortFunction, StepLongFunction {}
 
-/**
- * Execute an action.
- *
- * The various prototypes of this function are just provided to enhance type-checking:
- *
- * - If the action is asynchronous, the returned value will actually be a `Promise`.
- * - An unskippable step will return the action's return value, while a skippable step
- * can also return `undefined`.
- *
- * @param data The action to execute.
- * @param options
- *
- * @returns The value returned by the action, or undefined if the action was skipped.
- */
-export function step<T>(data: NonSkippableStep<T>, options?: StepOptions): T;
-export function step<T>(data: NonSkippableStep<Promise<T>>, options?: StepOptions): Promise<T>;
-export function step<T>(data: SkippableStep<T>, options?: StepOptions): T | undefined;
-export function step<T>(data: SkippableStep<Promise<T>>, options?: StepOptions): Promise<T> | undefined;
-export function step<T>(data: Step<T | Promise<T>>, options: StepOptions = {}): T | Promise<T> | undefined {
+export function step_impl<T>(data: Step<T | Promise<T>>, options: StepOptions = {}): T | Promise<T> | undefined {
   const start = new Date();
 
   const {title, action, skip} = data;
@@ -157,4 +148,32 @@ export function step<T>(data: Step<T | Promise<T>>, options: StepOptions = {}): 
       (err) => { const date = new Date(); log({type: StepEvents.FAILED, title, date, duration: date.getTime() - start.getTime()}); throw err; }
     )
     .resolve();
+}
+
+/**
+ * Execute an action.
+ *
+ * The various prototypes of this function are just provided to enhance type-checking:
+ *
+ * - If the action is asynchronous, the returned value will actually be a `Promise`.
+ * - An unskippable step will return the action's return value, while a skippable step
+ * can also return `undefined`.
+ *
+ * @param data The action to execute.
+ * @param options
+ *
+ * @returns The value returned by the action, or undefined if the action was skipped.
+ */
+export function step<T>(title: string, action: () => T, options?: StepOptions): T;
+export function step<T>(title: string, action: () => Promise<T>, options?: StepOptions): Promise<T>;
+export function step<T>(data: NonSkippableStep<T>, options?: StepOptions): T;
+export function step<T>(data: NonSkippableStep<Promise<T>>, options?: StepOptions): Promise<T>;
+export function step<T>(data: SkippableStep<T>, options?: StepOptions): T | undefined;
+export function step<T>(data: SkippableStep<Promise<T>>, options?: StepOptions): Promise<T> | undefined;
+export function step<T>(...args: any[]): T | Promise<T> | undefined {
+  if (typeof args[0] === 'string') {
+    return step_impl({title: args[0], action: args[1]}, args[2] || {});
+  } else {
+    return step_impl(args[0], args[1] || {});
+  }
 }

@@ -41,7 +41,7 @@ export declare function defaultLogFunction(e: StepEvent): void;
  * A non skippable step.
  * @template T Return type of the step.
  */
-interface NonSkippableStep<T> {
+export interface NonSkippableStep<T> {
     /** Title of the step. */
     title: string;
     /** The function to execute. */
@@ -51,17 +51,30 @@ interface NonSkippableStep<T> {
  * A step.
  * @template T Return type of the step.
  */
-interface Step<T> extends NonSkippableStep<T> {
+export interface Step<T> extends NonSkippableStep<T> {
     skip?: () => string | boolean;
 }
 /**
  * A skippable step.
  * @template T Return type of the step.
  */
-declare type SkippableStep<T> = Required<Step<T>>;
+export declare type SkippableStep<T> = Required<Step<T>>;
 /** Options accepted by [[`step`]]. */
 interface StepOptions {
     logFunction?: (e: StepEvent) => void;
+}
+export interface StepShortFunction {
+    <T>(title: string, action: () => T): T;
+    <T>(title: string, action: () => Promise<T>): Promise<T>;
+}
+export interface StepLongFunction {
+    <T>(data: NonSkippableStep<T>): T;
+    <T>(data: NonSkippableStep<Promise<T>>): Promise<T>;
+    <T>(data: SkippableStep<T>): T | undefined;
+    <T>(data: SkippableStep<Promise<T>>): Promise<T> | undefined;
+}
+export interface StepFunctionCommon {
+    <T>(...args: any[]): T | Promise<T> | undefined;
 }
 /**
  * Minimal prototype of the [[`step`]] function (without options).
@@ -73,17 +86,12 @@ interface StepOptions {
  * @example
  * ```typescript
  * function customLogFunction(e: StepEvent) { ... }
- * const customStep: StepFunction = (args: any) => step(args, {logFunction: customLogFunction})
+ * const customStep = ((...args: any[]) => (step as StepGenericPrototype)(...args, {logFunction: log})) as StepFunction;
  * ```
- *
- * @returns The value returned by the action.
  */
-export interface StepFunction {
-    <T>(data: NonSkippableStep<T>): T;
-    <T>(data: NonSkippableStep<Promise<T>>): Promise<T>;
-    <T>(data: SkippableStep<T>): T | undefined;
-    <T>(data: SkippableStep<Promise<T>>): Promise<T> | undefined;
+export interface StepFunction extends StepShortFunction, StepLongFunction {
 }
+export declare function step_impl<T>(data: Step<T | Promise<T>>, options?: StepOptions): T | Promise<T> | undefined;
 /**
  * Execute an action.
  *
@@ -98,6 +106,8 @@ export interface StepFunction {
  *
  * @returns The value returned by the action, or undefined if the action was skipped.
  */
+export declare function step<T>(title: string, action: () => T, options?: StepOptions): T;
+export declare function step<T>(title: string, action: () => Promise<T>, options?: StepOptions): Promise<T>;
 export declare function step<T>(data: NonSkippableStep<T>, options?: StepOptions): T;
 export declare function step<T>(data: NonSkippableStep<Promise<T>>, options?: StepOptions): Promise<T>;
 export declare function step<T>(data: SkippableStep<T>, options?: StepOptions): T | undefined;

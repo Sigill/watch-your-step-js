@@ -59,14 +59,14 @@ step({
 
 ## API
 
-### `step<T>(data[, options])`
+### `step<T>(data[, options])`, `step<T>(title, action[, options])`
 
 Execute an action.
 
 The various prototypes of this function are just provided to enhance type-checking:
 
 - If the action is asynchronous, the returned value will actually be a `Promise`.
-- An unskippable step will return the action's return value, while a skippable step
+- An unskippable step will return the action's return value. A skippable step
 can also return `undefined`.
 
 #### Parameters

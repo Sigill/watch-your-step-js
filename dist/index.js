@@ -36,7 +36,7 @@ export function defaultLogFunction(e) {
             break;
     }
 }
-export function step(data, options = {}) {
+export function step_impl(data, options = {}) {
     const start = new Date();
     const { title, action, skip } = data;
     const { logFunction: log = defaultLogFunction } = options;
@@ -49,5 +49,13 @@ export function step(data, options = {}) {
     return new ValueOrPromise(action)
         .then((args) => { const date = new Date(); log({ type: StepEvents.FULLFILLED, title, date, duration: date.getTime() - start.getTime() }); return args; }, (err) => { const date = new Date(); log({ type: StepEvents.FAILED, title, date, duration: date.getTime() - start.getTime() }); throw err; })
         .resolve();
+}
+export function step(...args) {
+    if (typeof args[0] === 'string') {
+        return step_impl({ title: args[0], action: args[1] }, args[2] || {});
+    }
+    else {
+        return step_impl(args[0], args[1] || {});
+    }
 }
 //# sourceMappingURL=index.js.map
