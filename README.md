@@ -19,11 +19,8 @@ import { step } from '@sigill/watch-your-step'
 step({
   title: 'Main step',
   action: () => {
-    step({
-      title: 'Substep 1',
-      action: () => {
-        console.log('Working on substep 1...');
-      }
+    step('Substep 1', () => {
+      console.log('Working on substep 1...');
     });
 
     step({
@@ -53,25 +50,22 @@ step({
 // [FAILURE] Substep 3 (1ms)
 // [FAILURE] Main step (4ms)
 // Error: something went wrong
-//     at action (file://[...]/example.ts:25:15)
+//     at action (file://[...]/example.ts:22:15)
 //     ...
 ```
 
 ## API
 
-### `step<T>(data[, options])`, `step<T>(title, action[, options])`
+### `step<T>(spec[, options])`, `step<T>(title, action[, options])`
 
 Execute an action.
 
-The various prototypes of this function are just provided to enhance type-checking:
-
-- If the action is asynchronous, the returned value will actually be a `Promise`.
-- An unskippable step will return the action's return value. A skippable step
-can also return `undefined`.
+The various prototypes of this function are just provided to enhance type-checking.
+In particular, if the step is skippable, its return value can be `undefined`.
 
 #### Parameters
 
-- `data` (`Step<T>`, required) - The action to execute.
+- `spec` (`Step<T>`, required) - The action to execute.
   - `title` (`string`, required) - Title of the step.
   - `action` (`() => T`, required) - The action to execute.
     If it is asynchronous, `T` is a `Promise`.

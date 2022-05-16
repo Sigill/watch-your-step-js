@@ -54,27 +54,19 @@ export interface NonSkippableStep<T> {
 export interface Step<T> extends NonSkippableStep<T> {
     skip?: () => string | boolean;
 }
-/**
- * A skippable step.
- * @template T Return type of the step.
- */
-export declare type SkippableStep<T> = Required<Step<T>>;
 /** Options accepted by [[`step`]]. */
 interface StepOptions {
     logFunction?: (e: StepEvent) => void;
 }
 export interface StepShortFunction {
     <T>(title: string, action: () => T): T;
-    <T>(title: string, action: () => Promise<T>): Promise<T>;
 }
 export interface StepLongFunction {
     <T>(data: NonSkippableStep<T>): T;
-    <T>(data: NonSkippableStep<Promise<T>>): Promise<T>;
-    <T>(data: SkippableStep<T>): T | undefined;
-    <T>(data: SkippableStep<Promise<T>>): Promise<T> | undefined;
+    <T>(data: Step<T>): T | undefined;
 }
 export interface StepFunctionCommon {
-    <T>(...args: any[]): T | Promise<T> | undefined;
+    <T>(...args: any[]): T | undefined;
 }
 /**
  * Minimal prototype of the [[`step`]] function (without options).
@@ -91,25 +83,33 @@ export interface StepFunctionCommon {
  */
 export interface StepFunction extends StepShortFunction, StepLongFunction {
 }
-export declare function step_impl<T>(data: Step<T | Promise<T>>, options?: StepOptions): T | Promise<T> | undefined;
+export declare function step_impl<T>(data: Step<T>, options?: StepOptions): T | undefined;
 /**
  * Execute an action.
  *
- * The various prototypes of this function are just provided to enhance type-checking:
+ * @param title Title of the task.
+ * @param action The action to execute.
+ * @param options
  *
- * - If the action is asynchronous, the returned value will actually be a `Promise`.
- * - An unskippable step will return the action's return value, while a skippable step
- * can also return `undefined`.
+ * @returns The value returned by the action.
+ */
+export declare function step<T>(title: string, action: () => T, options?: StepOptions): T;
+/**
+ * Execute an action.
  *
- * @param data The action to execute.
+ * @param specs Full configuration of the step.
+ * @param options
+ *
+ * @returns The value returned by the action.
+ */
+export declare function step<T>(specs: NonSkippableStep<T>, options?: StepOptions): T;
+/**
+ * Execute an action.
+ *
+ * @param specs Full configuration of the ste
  * @param options
  *
  * @returns The value returned by the action, or undefined if the action was skipped.
  */
-export declare function step<T>(title: string, action: () => T, options?: StepOptions): T;
-export declare function step<T>(title: string, action: () => Promise<T>, options?: StepOptions): Promise<T>;
-export declare function step<T>(data: NonSkippableStep<T>, options?: StepOptions): T;
-export declare function step<T>(data: NonSkippableStep<Promise<T>>, options?: StepOptions): Promise<T>;
-export declare function step<T>(data: SkippableStep<T>, options?: StepOptions): T | undefined;
-export declare function step<T>(data: SkippableStep<Promise<T>>, options?: StepOptions): Promise<T> | undefined;
+export declare function step<T>(specs: Step<T>, options?: StepOptions): T | undefined;
 export {};
