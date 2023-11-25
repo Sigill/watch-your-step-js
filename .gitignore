@@ -1,1 +1,5 @@
 node_modules
+dist/
+!dist/index.d.ts
+!dist/index.js
+!dist/index.js.map

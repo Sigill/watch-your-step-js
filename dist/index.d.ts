@@ -30,7 +30,7 @@ export interface StepFailedEvent extends StepSettledEvent {
     type: StepEvents.FAILED;
 }
 /** Type of all events passed to the log function. */
-export declare type StepEvent = StepStartedEvent | StepSkippedEvent | StepFullfilledEvent | StepFailedEvent;
+export type StepEvent = StepStartedEvent | StepSkippedEvent | StepFullfilledEvent | StepFailedEvent;
 /**
  * Defaults log function that logs events using `console.log()`.
  *
