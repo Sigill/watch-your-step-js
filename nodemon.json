@@ -1,7 +1,7 @@
 {
   "verbose": false,
   "ignore": [
-    "dist"
+    "dist/**"
   ],
   "ext": "ts",
   "exec": "npm run dev"
