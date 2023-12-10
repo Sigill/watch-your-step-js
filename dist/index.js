@@ -8,54 +8,81 @@ export var StepEvents;
     StepEvents["FAILED"] = "FAILED";
 })(StepEvents || (StepEvents = {}));
 /**
- * Defaults log function that logs events using `console.log()`.
- *
- * @param e The event.
+ * Defaults logger that logs events using `console.log()`.
  */
-export function defaultLogFunction(e) {
-    switch (e.type) {
-        case StepEvents.SKIPPED:
-            {
-                console.log(e.reason ? `[SKIPPED] ${e.title} (${e.reason})` : `[SKIPPED] ${e.title}`);
-            }
-            break;
-        case StepEvents.STARTED:
-            {
-                console.log(`[STARTED] ${e.title}`);
-            }
-            break;
-        case StepEvents.FULLFILLED:
-            {
-                console.log(`[SUCCESS] ${e.title} (${prettyMilliseconds(e.duration)})`);
-            }
-            break;
-        case StepEvents.FAILED:
-            {
-                console.log(`[FAILURE] ${e.title} (${prettyMilliseconds(e.duration)})`);
-            }
-            break;
+export class ConsoleLogger {
+    /**
+     * @param useGroup Boolean indicating if [[`console.group`]] will be used. Defaults to false.
+     */
+    constructor({ useGroup } = {}) {
+        this.useGroup = useGroup !== null && useGroup !== void 0 ? useGroup : false;
+    }
+    log(e) {
+        switch (e.type) {
+            case StepEvents.SKIPPED:
+                {
+                    console.log(e.reason ? `[SKIPPED] ${e.title} (${e.reason})` : `[SKIPPED] ${e.title}`);
+                }
+                break;
+            case StepEvents.STARTED:
+                {
+                    const message = `[STARTED] ${e.title}`;
+                    if (this.useGroup) {
+                        console.group(message);
+                    }
+                    else {
+                        console.log(message);
+                    }
+                }
+                break;
+            case StepEvents.FULLFILLED:
+                {
+                    console.groupEnd();
+                    console.log(`[SUCCESS] ${e.title} (${prettyMilliseconds(e.duration)})`);
+                }
+                break;
+            case StepEvents.FAILED:
+                {
+                    console.groupEnd();
+                    console.log(`[FAILURE] ${e.title} (${prettyMilliseconds(e.duration)})`);
+                }
+                break;
+        }
     }
 }
-export function step_impl(data, options = {}) {
+function executeStep(data, { logger }) {
     const start = new Date();
     const { title, action, skip } = data;
-    const { logFunction: log = defaultLogFunction } = options;
     const skipped = skip && skip();
     if (skipped) {
-        log({ type: StepEvents.SKIPPED, date: new Date(), title, reason: typeof skipped === 'string' ? skipped : undefined });
+        logger.log({ type: StepEvents.SKIPPED, date: new Date(), title, reason: typeof skipped === 'string' ? skipped : undefined });
         return;
     }
-    log({ type: StepEvents.STARTED, title, date: start });
+    logger.log({ type: StepEvents.STARTED, title, date: start });
     return new ValueOrPromise(action)
-        .then((args) => { const date = new Date(); log({ type: StepEvents.FULLFILLED, title, date, duration: date.getTime() - start.getTime() }); return args; }, (err) => { const date = new Date(); log({ type: StepEvents.FAILED, title, date, duration: date.getTime() - start.getTime() }); throw err; })
+        .then((args) => { const date = new Date(); logger.log({ type: StepEvents.FULLFILLED, title, date, duration: date.getTime() - start.getTime() }); return args; }, (err) => { const date = new Date(); logger.log({ type: StepEvents.FAILED, title, date, duration: date.getTime() - start.getTime() }); throw err; })
         .resolve();
 }
-export function step(...args) {
-    if (typeof args[0] === 'string') {
-        return step_impl({ title: args[0], action: args[1] }, args[2] || {});
-    }
-    else {
-        return step_impl(args[0], args[1] || {});
-    }
+/**
+ * Helper to initialize a new [[`step()`]] function.
+ *
+ * @param logger The logger to use.
+ *
+ * @returns A `StepFunction`.
+ */
+export function makeStepFunction(logger) {
+    const opts = { logger };
+    return function (...args) {
+        if (typeof args[0] === 'string') {
+            return executeStep({ title: args[0], action: args[1] }, opts);
+        }
+        else {
+            return executeStep(args[0], opts);
+        }
+    };
 }
+/**
+ * Default step function that uses a [[`ConsoleLogger`]].
+ */
+export const step = makeStepFunction(new ConsoleLogger());
 //# sourceMappingURL=index.js.map

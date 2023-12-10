@@ -32,14 +32,27 @@ export interface StepFailedEvent extends StepSettledEvent {
 /** Type of all events passed to the log function. */
 export type StepEvent = StepStartedEvent | StepSkippedEvent | StepFullfilledEvent | StepFailedEvent;
 /**
- * Defaults log function that logs events using `console.log()`.
- *
- * @param e The event.
+ * Logger interface.
  */
-export declare function defaultLogFunction(e: StepEvent): void;
+export interface Logger {
+    log(e: StepEvent): void;
+}
+/**
+ * Defaults logger that logs events using `console.log()`.
+ */
+export declare class ConsoleLogger implements Logger {
+    private readonly useGroup;
+    /**
+     * @param useGroup Boolean indicating if [[`console.group`]] will be used. Defaults to false.
+     */
+    constructor({ useGroup }?: {
+        useGroup?: boolean;
+    });
+    log(e: StepEvent): void;
+}
 /**
  * A non skippable step.
- * @template T Return type of the step.
+ * @template T Return type of the action.
  */
 export interface NonSkippableStep<T> {
     /** Title of the step. */
@@ -49,67 +62,50 @@ export interface NonSkippableStep<T> {
 }
 /**
  * A step.
- * @template T Return type of the step.
+ * @template T Return type of the action.
  */
 export interface Step<T> extends NonSkippableStep<T> {
     skip?: () => string | boolean;
 }
-/** Options accepted by [[`step`]]. */
-interface StepOptions {
-    logFunction?: (e: StepEvent) => void;
-}
-export interface StepShortFunction {
+/**
+ * Prototype of the [[`step`]] function.
+ */
+export interface StepFunction {
+    /**
+     * Execute an action.
+     *
+     * @param title Title of the task.
+     * @param action The action to execute.
+     *
+     * @returns The value returned by the action.
+     */
     <T>(title: string, action: () => T): T;
-}
-export interface StepLongFunction {
+    /**
+     * Execute an action.
+     *
+     * @param specs Full configuration of the step.
+     *
+     * @returns The value returned by the action.
+     */
     <T>(data: NonSkippableStep<T>): T;
+    /**
+     * Execute an action.
+     *
+     * @param specs Full configuration of the ste
+     *
+     * @returns The value returned by the action, or undefined if the action was skipped.
+     */
     <T>(data: Step<T>): T | undefined;
 }
-export interface StepFunctionCommon {
-    <T>(...args: any[]): T | undefined;
-}
 /**
- * Minimal prototype of the [[`step`]] function (without options).
+ * Helper to initialize a new [[`step()`]] function.
  *
- * Use it when you need to define a customized version of [[`step`]].
+ * @param logger The logger to use.
  *
- * See [[`step`]] for more details about the various prototypes.
- *
- * @example
- * ```typescript
- * function customLogFunction(e: StepEvent) { ... }
- * const customStep = ((...args: any[]) => (step as StepGenericPrototype)(...args, {logFunction: log})) as StepFunction;
- * ```
+ * @returns A `StepFunction`.
  */
-export interface StepFunction extends StepShortFunction, StepLongFunction {
-}
-export declare function step_impl<T>(data: Step<T>, options?: StepOptions): T | undefined;
+export declare function makeStepFunction(logger: Logger): StepFunction;
 /**
- * Execute an action.
- *
- * @param title Title of the task.
- * @param action The action to execute.
- * @param options
- *
- * @returns The value returned by the action.
+ * Default step function that uses a [[`ConsoleLogger`]].
  */
-export declare function step<T>(title: string, action: () => T, options?: StepOptions): T;
-/**
- * Execute an action.
- *
- * @param specs Full configuration of the step.
- * @param options
- *
- * @returns The value returned by the action.
- */
-export declare function step<T>(specs: NonSkippableStep<T>, options?: StepOptions): T;
-/**
- * Execute an action.
- *
- * @param specs Full configuration of the ste
- * @param options
- *
- * @returns The value returned by the action, or undefined if the action was skipped.
- */
-export declare function step<T>(specs: Step<T>, options?: StepOptions): T | undefined;
-export {};
+export declare const step: StepFunction;

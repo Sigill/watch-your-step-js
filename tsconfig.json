@@ -17,7 +17,8 @@
   },
   "files": [
     "index.ts",
-    "test.spec.ts"
+    "test.spec.ts",
+    "example.ts"
   ],
   "exclude": [
     "./dist/**/*"

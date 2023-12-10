@@ -54,11 +54,22 @@ step({
 //     ...
 ```
 
+To use a custom logger:
+
+```typescript
+import { ConsoleLogger, makeStepFunction } from './index.js';
+
+const logger = new ConsoleLogger({useGroup: true}); // Or any custom logger.
+const step = makeStepFunction(logger);
+
+step(...);
+```
+
 ## API
 
-### `step<T>(spec[, options])`, `step<T>(title, action[, options])`
+### `step<T>(spec)`, `step<T>(title, action)`
 
-Execute an action.
+Executes an action.
 
 The various prototypes of this function are just provided to enhance type-checking.
 In particular, if the step is skippable, its return value can be `undefined`.
@@ -71,12 +82,24 @@ In particular, if the step is skippable, its return value can be `undefined`.
     If it is asynchronous, `T` is a `Promise`.
   - `skip` (`() => string | boolean`, optional) - If thuthy, skips the action.
     If the returned value is a `string`, its value should describe why the action has been skipped.
-- `options` (`StepOptions`, optional)
-  - `logFunction` (`(e: Event) => void`, optional) - Function that will received the step's event. Defaults to `defaultLogFunction`.
 
 #### Returns
 
 - `T | undefined` - The value returned by the action, or undefined if the action was skipped.
+
+### `makeStepFunction(logger: Logger)`
+
+Creates a new `step()` function that uses the specified logger.
+
+See the `Logger` class for details on how to write your own.
+
+### `ConsoleLogger`
+
+Default `Logger` implementation that logs step events to the console.
+
+#### Parameters
+
+- `useGroup` (`boolean`, optional, defaults to `false`) - Indicates if `console.group` will be used when logging step events.
 
 ## License
 

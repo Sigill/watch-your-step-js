@@ -1,6 +1,6 @@
 {
   "name": "@sigill/watch-your-step",
-  "version": "0.1.6",
+  "version": "0.2.0",
   "type": "module",
   "description": "Wraps a function in order to emit log upon start/finish/error.",
   "keywords": [
@@ -21,7 +21,7 @@
   "scripts": {
     "lint": "eslint *.ts",
     "build": "tsc",
-    "test": "cross-env NODE_OPTIONS='-r source-map-support/register' mocha ./dist/*.spec.js",
+    "test": "mocha --enable-source-maps ./dist/*.spec.js",
     "dev": "npm run lint && npm run build && npm run test",
     "watch": "nodemon"
   },
@@ -44,12 +44,10 @@
     "@typescript-eslint/eslint-plugin": "^6.12.0",
     "chai": "^4.3.6",
     "chai-as-promised": "^7.1.1",
-    "cross-env": "^7.0.3",
     "eslint": "^8.14.0",
     "mocha": "^10.2.0",
     "nodemon": "^3.0.1",
     "sinon-chai": "^3.7.0",
-    "source-map-support": "^0.5.21",
     "typescript": "^5.3.2"
   }
 }

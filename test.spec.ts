@@ -1,8 +1,8 @@
 import * as chai from 'chai';
 import * as sinon from 'sinon';
 import chaiAsPromised  from 'chai-as-promised';
-import sinonChai from "sinon-chai";
-import { defaultLogFunction, step, StepEvents, StepFunctionCommon, StepLongFunction, StepShortFunction } from './index.js';
+import sinonChai from 'sinon-chai';
+import { ConsoleLogger, makeStepFunction, StepEvents } from './index.js';
 
 chai.use(chaiAsPromised);
 chai.use(sinonChai);
@@ -18,44 +18,83 @@ const hasNo = (member: string | number) => sinon.match(function (value) {
   return value[member] === undefined;
 }, `hasNo(${quoteIfString(member)})`);
 
-
-describe('defaultLogFunction()', function() {
+describe('ConsoleLogger', function() {
+  const logger = new ConsoleLogger();
   let log: sinon.SinonSpy<[message?: any, ...optionalParams: any[]], void>;
   beforeEach(function() {
-    log = sinon.spy(console, 'log');
+    log = sinon.stub(console, 'log');
   });
   afterEach(function() {
     sinon.restore();
   });
 
   it('log start events', function() {
-    defaultLogFunction({type: StepEvents.STARTED, title: 'started step', date: new Date()});
+    logger.log({type: StepEvents.STARTED, title: 'started step', date: new Date()});
     expect(log).to.have.been.calledOnceWith('[STARTED] started step');
   });
 
   it('log skip events', function() {
-    defaultLogFunction({type: StepEvents.SKIPPED, title: 'skipped step', date: new Date()});
+    logger.log({type: StepEvents.SKIPPED, title: 'skipped step', date: new Date()});
     expect(log).to.have.been.calledOnceWith('[SKIPPED] skipped step');
   });
 
   it('log success events', function() {
-    defaultLogFunction({type: StepEvents.FULLFILLED, title: 'successful step', date: new Date(), duration: 200});
+    logger.log({type: StepEvents.FULLFILLED, title: 'successful step', date: new Date(), duration: 200});
     expect(log).to.have.been.calledOnceWith('[SUCCESS] successful step (200ms)');
   });
 
   it('log failure events', function() {
-    defaultLogFunction({type: StepEvents.FAILED, title: 'failed step', date: new Date(), duration: 1200});
+    logger.log({type: StepEvents.FAILED, title: 'failed step', date: new Date(), duration: 1200});
     expect(log).to.have.been.calledOnceWith('[FAILURE] failed step (1.2s)');
   });
 });
 
-describe('step()', function() {
+describe('ConsoleLoggerWithGroup', function() {
+  const logger = new ConsoleLogger({useGroup: true});
+  let log: sinon.SinonSpy<Parameters<typeof console['log']>, ReturnType<typeof console['log']>>;
+  let group: sinon.SinonSpy<Parameters<typeof console['group']>, ReturnType<typeof console['group']>>;
+  let groupEnd: sinon.SinonSpy<Parameters<typeof console['groupEnd']>, ReturnType<typeof console['groupEnd']>>;
+  beforeEach(function() {
+    log = sinon.stub(console, 'log');
+    group = sinon.stub(console, 'group');
+    groupEnd = sinon.stub(console, 'groupEnd');
+  });
+  afterEach(function() {
+    sinon.restore();
+  });
+
+  it('log start events', function() {
+    logger.log({type: StepEvents.STARTED, title: 'started step', date: new Date()});
+    expect(group).to.have.been.calledOnceWith('[STARTED] started step');
+  });
+
+  it('log skip events', function() {
+    logger.log({type: StepEvents.SKIPPED, title: 'skipped step', date: new Date()});
+    expect(log).to.have.been.calledOnceWith('[SKIPPED] skipped step');
+  });
+
+  it('log success events', function() {
+    logger.log({type: StepEvents.FULLFILLED, title: 'successful step', date: new Date(), duration: 200});
+    expect(log).to.have.been.calledOnceWith('[SUCCESS] successful step (200ms)');
+    expect(groupEnd).to.have.been.calledOnceWith();
+  });
+
+  it('log failure events', function() {
+    logger.log({type: StepEvents.FAILED, title: 'failed step', date: new Date(), duration: 1200});
+    expect(log).to.have.been.calledOnceWith('[FAILURE] failed step (1.2s)');
+    expect(groupEnd).to.have.been.calledOnceWith();
+  });
+});
+
+describe('step', function() {
   let log: sinon.SinonSpy;
+  let spiedStep: ReturnType<typeof makeStepFunction>;
   const title = 'action title';
   const reason = 'because';
 
   beforeEach(function() {
     log = sinon.spy();
+    spiedStep = makeStepFunction({log});
   });
   afterEach(function() {
     sinon.restore();
@@ -98,8 +137,6 @@ describe('step()', function() {
   }
 
   describe('using object syntax', () => {
-    const spiedStep = ((...args: any[]) => (step as StepFunctionCommon)(...args, {logFunction: log})) as StepLongFunction;
-
     it("emits 'started' and 'fullfilled' events, then returns the value returned by a synchronous function", function() {
       const a: number = spiedStep({title, action: () => 42});
       expect(a).to.be.equal(42);
@@ -152,8 +189,6 @@ describe('step()', function() {
   });
 
   describe('using shorthand syntax', () => {
-    const spiedStep = ((...args: any[]) => (step as StepFunctionCommon)(...args, {logFunction: log})) as StepShortFunction;
-
     it("emits 'started' and 'fullfilled' events, then returns the value returned by a synchronous function", function() {
       const a: number = spiedStep(title, () => 42);
       expect(a).to.be.equal(42);

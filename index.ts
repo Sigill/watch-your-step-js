@@ -45,30 +45,56 @@ export interface StepFailedEvent extends StepSettledEvent {
 export type StepEvent = StepStartedEvent | StepSkippedEvent | StepFullfilledEvent | StepFailedEvent;
 
 /**
- * Defaults log function that logs events using `console.log()`.
- *
- * @param e The event.
+ * Logger interface.
  */
-export function defaultLogFunction(e: StepEvent) {
-  switch (e.type) {
-    case StepEvents.SKIPPED: {
-      console.log(e.reason ? `[SKIPPED] ${e.title} (${e.reason})` : `[SKIPPED] ${e.title}`);
-    } break;
-    case StepEvents.STARTED: {
-      console.log(`[STARTED] ${e.title}`);
-    } break;
-    case StepEvents.FULLFILLED: {
-      console.log(`[SUCCESS] ${e.title} (${prettyMilliseconds(e.duration)})`);
-    } break;
-    case StepEvents.FAILED: {
-      console.log(`[FAILURE] ${e.title} (${prettyMilliseconds(e.duration)})`);
-    } break;
+export interface Logger {
+  /*
+   * @param e The event.
+   */
+  log(e: StepEvent): void;
+}
+
+/**
+ * Defaults logger that logs events using `console.log()`.
+ */
+export class ConsoleLogger implements Logger {
+  private readonly useGroup: boolean;
+
+  /**
+   * @param useGroup Boolean indicating if [[`console.group`]] will be used. Defaults to false.
+   */
+  constructor({useGroup}: {useGroup?: boolean} = {}) {
+    this.useGroup = useGroup ?? false;
+  }
+
+  log(e: StepEvent) {
+    switch (e.type) {
+      case StepEvents.SKIPPED: {
+        console.log(e.reason ? `[SKIPPED] ${e.title} (${e.reason})` : `[SKIPPED] ${e.title}`);
+      } break;
+      case StepEvents.STARTED: {
+        const message = `[STARTED] ${e.title}`;
+        if (this.useGroup) {
+          console.group(message);
+        } else {
+          console.log(message);
+        }
+      } break;
+      case StepEvents.FULLFILLED: {
+        console.groupEnd();
+        console.log(`[SUCCESS] ${e.title} (${prettyMilliseconds(e.duration)})`);
+      } break;
+      case StepEvents.FAILED: {
+        console.groupEnd();
+        console.log(`[FAILURE] ${e.title} (${prettyMilliseconds(e.duration)})`);
+      } break;
+    }
   }
 }
 
 /**
  * A non skippable step.
- * @template T Return type of the step.
+ * @template T Return type of the action.
  */
 export interface NonSkippableStep<T> {
   /** Title of the step. */
@@ -80,102 +106,86 @@ export interface NonSkippableStep<T> {
 
 /**
  * A step.
- * @template T Return type of the step.
+ * @template T Return type of the action.
  */
 export interface Step<T> extends NonSkippableStep<T> {
   skip?: () => string | boolean;
 }
 
-/** Options accepted by [[`step`]]. */
-interface StepOptions {
-  logFunction?: (e: StepEvent) => void;
-}
-
- export interface StepShortFunction {
-  <T>(title: string, action: () => T): T;
-}
-
-export interface StepLongFunction {
-  <T>(data: NonSkippableStep<T>): T;
-  <T>(data: Step<T>): T | undefined;
-}
-
-export interface StepFunctionCommon {
-  <T>(...args: any[]): T | undefined;
-}
-
-/**
- * Minimal prototype of the [[`step`]] function (without options).
- *
- * Use it when you need to define a customized version of [[`step`]].
- *
- * See [[`step`]] for more details about the various prototypes.
- *
- * @example
- * ```typescript
- * function customLogFunction(e: StepEvent) { ... }
- * const customStep = ((...args: any[]) => (step as StepGenericPrototype)(...args, {logFunction: log})) as StepFunction;
- * ```
- */
-export interface StepFunction extends StepShortFunction, StepLongFunction {}
-
-export function step_impl<T>(data: Step<T>, options: StepOptions = {}): T | undefined {
+function executeStep<T>(data: Step<T>, {logger}: {logger: Logger}): T | undefined {
   const start = new Date();
 
   const {title, action, skip} = data;
-  const {logFunction: log = defaultLogFunction} = options;
 
   const skipped = skip && skip();
   if (skipped) {
-    log({type: StepEvents.SKIPPED, date: new Date(), title, reason: typeof skipped === 'string' ? skipped : undefined});
+    logger.log({type: StepEvents.SKIPPED, date: new Date(), title, reason: typeof skipped === 'string' ? skipped : undefined});
     return;
   }
 
-  log({type: StepEvents.STARTED, title, date: start})
+  logger.log({type: StepEvents.STARTED, title, date: start})
 
   return new ValueOrPromise(action)
     .then(
-      (args) => { const date = new Date(); log({type: StepEvents.FULLFILLED, title, date, duration: date.getTime() - start.getTime()}); return args; },
-      (err) => { const date = new Date(); log({type: StepEvents.FAILED, title, date, duration: date.getTime() - start.getTime()}); throw err; }
+      (args) => { const date = new Date(); logger.log({type: StepEvents.FULLFILLED, title, date, duration: date.getTime() - start.getTime()}); return args; },
+      (err) => { const date = new Date(); logger.log({type: StepEvents.FAILED, title, date, duration: date.getTime() - start.getTime()}); throw err; }
     )
     .resolve() as T;
 }
 
 /**
- * Execute an action.
- *
- * @param title Title of the task.
- * @param action The action to execute.
- * @param options
- *
- * @returns The value returned by the action.
+ * Prototype of the [[`step`]] function.
  */
-export function step<T>(title: string, action: () => T, options?: StepOptions): T;
+export interface StepFunction {
+  /**
+   * Execute an action.
+   *
+   * @param title Title of the task.
+   * @param action The action to execute.
+   *
+   * @returns The value returned by the action.
+   */
+  <T>(title: string, action: () => T): T;
 
-/**
- * Execute an action.
- *
- * @param specs Full configuration of the step.
- * @param options
- *
- * @returns The value returned by the action.
- */
-export function step<T>(specs: NonSkippableStep<T>, options?: StepOptions): T;
+  /**
+   * Execute an action.
+   *
+   * @param specs Full configuration of the step.
+   *
+   * @returns The value returned by the action.
+   */
+  <T>(data: NonSkippableStep<T>): T;
 
-/**
- * Execute an action.
- *
- * @param specs Full configuration of the ste
- * @param options
- *
- * @returns The value returned by the action, or undefined if the action was skipped.
- */
-export function step<T>(specs: Step<T>, options?: StepOptions): T | undefined;
-
-export function step<T>(...args: any[]): T | undefined {
-  if (typeof args[0] === 'string') {
-    return step_impl({title: args[0], action: args[1]}, args[2] || {});
-  } else {
-    return step_impl(args[0], args[1] || {});
-  }
+  /**
+   * Execute an action.
+   *
+   * @param specs Full configuration of the ste
+   *
+   * @returns The value returned by the action, or undefined if the action was skipped.
+   */
+  <T>(data: Step<T>): T | undefined;
 }
+
+/**
+ * Helper to initialize a new [[`step()`]] function.
+ *
+ * @param logger The logger to use.
+ *
+ * @returns A `StepFunction`.
+ */
+export function makeStepFunction(logger: Logger): StepFunction {
+  const opts = {logger};
+
+  return function <T>(...args: any[]): T | undefined {
+    if (typeof args[0] === 'string') {
+      return executeStep({title: args[0], action: args[1]}, opts);
+    } else {
+      return executeStep(args[0], opts);
+    }
+  } as StepFunction;
+}
+
+/**
+ * Default step function that uses a [[`ConsoleLogger`]].
+ */
+export const step = makeStepFunction(new ConsoleLogger());
